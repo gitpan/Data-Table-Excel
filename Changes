@@ -1,0 +1,8 @@
+Revision history for Perl extension Data::Table::Excel.
+0.1 Mon Jul 23 12:35:56 PDT 2012
+  Clean up code and documentation.
+  Added support for .xlsx
+  Ready for CPAN release
+
+0.01 Fri Jan  4 00:47:42 PST 2008
+  First version
