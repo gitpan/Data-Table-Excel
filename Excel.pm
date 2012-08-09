@@ -10,17 +10,17 @@ use Excel::Writer::XLSX;
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK);
 use Carp;
 
-require Exporter;
-require AutoLoader;
+use Exporter 'import';
 
 @ISA = qw(Exporter AutoLoader);
 # Items to export into callers namespace by default. Note: do not export
 # names by default without a very good reason. Use EXPORT_OK instead.
 # Do not simply export all your public functions/methods/constants.
-@EXPORT = qw(
+@EXPORT = ();
+@EXPORT_OK = qw(
   tables2xls xls2tables tables2xlsx xlsx2tables
 );
-$VERSION = '0.1';
+$VERSION = '0.2';
 
 sub xls2tables {
   my ($fileName, $sheetNames, $sheetIndices) = @_;
@@ -182,7 +182,10 @@ Data::Table::Excel - Convert between Data::Table objects and Excel (xls/xlsx) fi
 
 =head1 SYNOPSIS
   
-  use Data::Table::Excel;
+  News: The package now includes "Perl Data::Table Cookbook" (PDF), which may serve as a better learning material.
+  To download the free Cookbook, visit https://sites.google.com/site/easydatabase/
+
+  use Data::Table::Excel qw (tables2xls xls2tables tables2xlsx xlsx2tables);
 
   # read in two CSV tables and generate an Excel .xls binary file with two spreadsheets
   my $t_category = Data::Table::fromFile("Category.csv");

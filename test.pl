@@ -6,14 +6,12 @@
 # Change 1..1 below to 1..last_test_to_print .
 # (It may become useful if the test is moved to ./t subdirectory.)
 
-BEGIN { $| = 1; print "1..2\n"; 
-unshift @INC, "../Data-Table-1.54" }
-
+BEGIN { $| = 1; print "1..4\n"; }
 END {print "not ok 1\n" unless $loaded;}
 
 #use strict;
 use Data::Table;
-use Data::Table::Excel;
+use Data::Table::Excel qw(tables2xls xls2tables tables2xlsx xlsx2tables);
 use Data::Dumper;
 
 $loaded = 1;
