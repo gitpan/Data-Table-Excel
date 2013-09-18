@@ -60,6 +60,7 @@ sub excelFileToTable {
     $num++;
     next if ((scalar keys %sheetsName) && !defined($sheetsName{$sheet->{Name}}));
     next if ((scalar keys %sheetsIndex) && !defined($sheetsIndex{$num}));
+    next unless defined($sheet->{MinRow}) && defined($sheet->{MaxRow}) && defined($sheet->{MinCol}) && defined($sheet->{MaxRow});
     push @sheets, $sheet->{Name};
     #printf("Sheet: %s\n", $sheet->{Name});
     $sheet->{MaxRow} ||= $sheet->{MinRow};
@@ -216,13 +217,14 @@ Data::Table::Excel - Convert between Data::Table objects and Excel (xls/xlsx) fi
   3,Aniseed Syrup,2,10,13,FALSE
   ...
 
-  # to deal with Excel 2007 format (.xlsx), use
-  # since not table name is supplied, they will be named Sheet1 and Sheet2.
+  # to deal with Excel 2007 format (.xlsx), use xlsx2tables instead.
+  # since no table name is supplied, they will be named Sheet1 and Sheet2.
   # here we also provide custom colors for each sheet, color array is for [OddRow, EvenRow, HeaderRow]
+
   tables2xlsx("NorthWind.xlsx", [$t_category, $t_product], undef, [['silver','white','black'], [45,'white',37]]);
   # read in NorthWind.xlsx file as two Data::Table objects
   my ($tableObjects, $tableNames)=xlsx2tables("NorthWind.xlsx");
-  
+  # note: Spreadsheet::XLSX module is used to parse .xlsx file. Please make sure it is updated.
 
 =head1 ABSTRACT
 
@@ -231,6 +233,9 @@ This perl package provide utility methods to convert between an Excel file and D
 =head1 DESCRIPTION
 
 =over 4
+
+To read and write Excel .xls (2003 and prior) format, we use Spreadsheet::WriteExcel and Spreadsheet::ParseExcel; to read and write Excel .xlsx (2007 format),
+we use Spreadsheet::XLSX and Excel::Writer::XLSX.  If this module gives incorrect results, please check if the corresponding Perl modules are updated.
 
 =item xls2tables ($fileName, $sheetNames, $sheetIndices) 
 

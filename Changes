@@ -1,4 +1,8 @@
 Revision history for Perl extension Data::Table::Excel.
+
+0.3 Wed Feb 20 20:41:17 PST 2013
+  Fix an exception in excelFileToTable when a spreadsheet has no data
+
 0.2 Wed Aug  8 20:31:33 PDT 2012
   Remove inheritance from AutoLoader
   Remove methods from exporter by default
