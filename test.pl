@@ -11,7 +11,7 @@ END {print "not ok 1\n" unless $loaded;}
 
 #use strict;
 use Data::Table;
-use Data::Table::Excel qw(tables2xls xls2tables tables2xlsx xlsx2tables);
+use Data::Table::Excel qw(tables2xls xls2tables tables2xlsx xlsx2tables is_xlsx xls2xlsx xlsx2xls excelFileToTable);
 use Data::Dumper;
 
 $loaded = 1;
@@ -71,5 +71,39 @@ if (scalar @$tableObjects !=2 || scalar @$tableNames !=2) {
     print "not ok 4 xlsx2tables\n";
   }
 }
+
+if (is_xlsx('NorthWind.xlsx') and !is_xlsx('NorthWind.xls')) {
+  print "ok 5 is_xlsx\n";
+} else {
+  print "not ok 5 is_xlsx\n";
+}
+
+my ($tableObjects2) = excelFileToTable("NorthWind.xlsx");
+if ($tableObjects->[0]->nofRow==$tableObjects2->[0]->nofRow && $tableObjects->[1]->nofRow==$tableObjects2->[1]->nofRow &&
+    $tableObjects->[0]->nofCol==$tableObjects2->[0]->nofCol && $tableObjects->[1]->nofCol==$tableObjects2->[1]->nofCol) {
+  print "ok 6 excelFileToTable\n";
+} else {
+  print "not ok 6 excelFileToTable\n";
+}
+
+xls2xlsx('NorthWind.xls', 't.xlsx');
+my ($tableObjects2) = xlsx2tables("t.xlsx");
+if ($tableObjects->[0]->nofRow==$tableObjects2->[0]->nofRow && $tableObjects->[1]->nofRow==$tableObjects2->[1]->nofRow &&
+    $tableObjects->[0]->nofCol==$tableObjects2->[0]->nofCol && $tableObjects->[1]->nofCol==$tableObjects2->[1]->nofCol) {
+  print "ok 7 xls2xlsx\n";
+} else {
+  print "not ok 7 xlsx2xls\n";
+}
+if (-e 't.xlsx') { unlink("t.xlsx") }
+
+xlsx2xls('NorthWind.xlsx', 't.xls');
+my ($tableObjects2) = xls2tables("t.xls");
+if ($tableObjects->[0]->nofRow==$tableObjects2->[0]->nofRow && $tableObjects->[1]->nofRow==$tableObjects2->[1]->nofRow &&
+    $tableObjects->[0]->nofCol==$tableObjects2->[0]->nofCol && $tableObjects->[1]->nofCol==$tableObjects2->[1]->nofCol) {
+  print "ok 8 xlsx2xls\n";
+} else {
+  print "not ok 8 xlsx2xls\n";
+}
+if (-e 't.xls') { unlink("t.xls") }
 
 1;

@@ -9,7 +9,6 @@ use Spreadsheet::XLSX;
 use Excel::Writer::XLSX;
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK);
 use Carp;
-
 use Exporter 'import';
 
 @ISA = qw(Exporter AutoLoader);
@@ -18,9 +17,9 @@ use Exporter 'import';
 # Do not simply export all your public functions/methods/constants.
 @EXPORT = ();
 @EXPORT_OK = qw(
-  tables2xls xls2tables tables2xlsx xlsx2tables
+  tables2xls xls2tables tables2xlsx xlsx2tables xls2xlsx xlsx2xls is_xlsx excelFileToTable
 );
-$VERSION = '0.2';
+$VERSION = '0.4';
 
 sub xls2tables {
   my ($fileName, $sheetNames, $sheetIndices) = @_;
@@ -30,6 +29,16 @@ sub xls2tables {
 sub xlsx2tables {
   my ($fileName, $sheetNames, $sheetIndices) = @_;
   return excelFileToTable($fileName, $sheetNames, $sheetIndices, '2007');
+}
+
+sub is_xlsx {
+    my $filename=shift;
+    open(IN, $filename) or die "Cannot open $filename!";
+    binmode IN;
+    my $buffer;
+    read(IN, $buffer, 2, 0);
+    close(IN);
+    return uc($buffer) eq 'PK';
 }
 
 sub excelFileToTable {
@@ -46,6 +55,9 @@ sub excelFileToTable {
     }
   }
   my $excel = undef;
+  if (!defined($excelFormat)) {
+    $excelFormat=is_xlsx($fileName)?'2007':'2003';
+  }
   if ($excelFormat eq '2003') {
     $excel = Spreadsheet::ParseExcel::Workbook->Parse($fileName);
   } elsif ($excelFormat eq '2007') {
@@ -55,6 +67,7 @@ sub excelFileToTable {
   }
   my @tables = ();
   my @sheets = ();
+  my @column_headers = ();
   my $num = 0;
   foreach my $sheet (@{$excel->{Worksheet}}) {
     $num++;
@@ -72,7 +85,9 @@ sub excelFileToTable {
     }    
     my $s = join($Data::Table::DEFAULTS{CSV_DELIMITER}, map {Data::Table::csvEscape($_)} @header);
     my $t = undef;
-    if (Data::Table::fromFileIsHeader($s, $Data::Table::DEFAULTS{CSV_DELIMITER})) {
+    my $hasColumnHeader=Data::Table::fromFileIsHeader($s, $Data::Table::DEFAULTS{CSV_DELIMITER});
+    push @column_headers, $hasColumnHeader;
+    if ($hasColumnHeader) {
       $t = new Data::Table([], \@header, 0);
     } else {
       my @newHeader =  map {"col$_"} (1..($sheet->{MaxCol}-$sheet->{MinCol}+1));
@@ -89,13 +104,14 @@ sub excelFileToTable {
     }
     push @tables, $t;
   }
-  return (\@tables, \@sheets);
+  return (\@tables, \@sheets, \@column_headers);
 }
 
 # color palette is defined in
 # http://search.cpan.org/src/JMCNAMARA/Spreadsheet-WriteExcel-2.20/doc/palette.html
 sub oneTable2Worksheet {
-  my ($workbook, $t, $name, $colors, $portrait) = @_;
+  my ($workbook, $t, $name, $colors, $portrait, $column_header) = @_;
+  $column_header = 0 unless defined($column_header);
   # Add a worksheet
   my $worksheet = $workbook->add_worksheet($name);
   $portrait=1 unless defined($portrait);
@@ -113,34 +129,41 @@ sub oneTable2Worksheet {
   my @FORMAT = ($fmt_odd, $fmt_even);
 
   my @header=$t->header;
+  my $offset=($column_header)? 1:0;
   if ($portrait) {
-    for (my $i=0; $i<@header; $i++) {
-      $worksheet->write(0, $i, $header[$i], $fmt_header);
+    if ($column_header) {
+      for (my $i=0; $i<@header; $i++) {
+        $worksheet->write(0, $i, $header[$i], $fmt_header);
+      }
     }
     for (my $i=0; $i<$t->nofRow; $i++) {
       for (my $j=0; $j<$t->nofCol; $j++) {
-        $worksheet->write($i+1, $j, $t->elm($i,$j), $FORMAT[$i%2]);
+        $worksheet->write($i+$offset, $j, $t->elm($i,$j), $FORMAT[$i%2]);
       }
     }
   } else {
-    for (my $i=0; $i<@header; $i++) {
-      $worksheet->write($i, 0, $header[$i], $fmt_header);
+    if ($column_header) {
+      for (my $i=0; $i<@header; $i++) {
+        $worksheet->write($i, 0, $header[$i], $fmt_header);
+      }
     }
     for (my $i=0; $i<$t->nofRow; $i++) {
       for (my $j=0; $j<$t->nofCol; $j++) {
-        $worksheet->write($j, $i+1, $t->elm($i,$j), $FORMAT[$i%2]);
+        $worksheet->write($j, $i+$offset, $t->elm($i,$j), $FORMAT[$i%2]);
       }
     }
   }
 }
 
 sub tables2excelFile {
-  my ($fileName, $tables, $names, $colors, $portrait, $excelFormat) = @_;
+  my ($fileName, $tables, $names, $colors, $portrait, $excelFormat, $column_headers) = @_;
   confess("No table is specified!\n") unless (defined($tables)&&(scalar @$tables));
   $names =[] unless defined($names);
   $colors=[] unless defined($colors);
   $portrait=[] unless defined($portrait);
+  $column_headers=[1] unless defined($column_headers);
   my $workbook = undef;
+  $excelFormat='2007' unless defined($excelFormat);
   if ($excelFormat eq '2003') {
     $workbook = Spreadsheet::WriteExcel->new($fileName);
   } elsif ($excelFormat eq '2007') {
@@ -149,7 +172,7 @@ sub tables2excelFile {
     croak "Unrecognized Excel format, must be either 2003 or 2007!";
   }
   $portrait=[] unless defined($portrait);
-  my ($prevColors, $prevPortrait) = (undef, undef);
+  my ($prevColors, $prevPortrait, $prevColumnHeader) = (undef, undef, undef);
   for (my $i=0; $i<@$tables; $i++) {
     my $myColor=$colors->[$i];
     $myColor=$prevColors if (!defined($myColor) && defined($prevColors));
@@ -158,18 +181,41 @@ sub tables2excelFile {
     $myPortrait=$prevPortrait if (!defined($myPortrait) && defined($prevPortrait));
     $prevPortrait=$myPortrait;
 	my $mySheet = $names->[$i] ? $names->[$i]:"Sheet".($i+1);
-    oneTable2Worksheet($workbook, $tables->[$i], $mySheet, $myColor, $myPortrait);
+    my $myColumnHeader = $column_headers->[$i];
+    $myColumnHeader = $prevColumnHeader if (!defined($myColumnHeader) && defined($prevColumnHeader));
+    $prevColumnHeader=$myColumnHeader;
+    oneTable2Worksheet($workbook, $tables->[$i], $mySheet, $myColor, $myPortrait, $myColumnHeader);
   }
 }
 
 sub tables2xls {
-  my ($fileName, $tables, $names, $colors, $portrait) = @_;
-  tables2excelFile($fileName, $tables, $names, $colors, $portrait, '2003');
+  my ($fileName, $tables, $names, $colors, $portrait, $column_headers) = @_;
+  tables2excelFile($fileName, $tables, $names, $colors, $portrait, '2003', $column_headers);
 }
 
 sub tables2xlsx {
-  my ($fileName, $tables, $names, $colors, $portrait) = @_;
-  tables2excelFile($fileName, $tables, $names, $colors, $portrait, '2007');
+  my ($fileName, $tables, $names, $colors, $portrait, $column_headers) = @_;
+  tables2excelFile($fileName, $tables, $names, $colors, $portrait, '2007', $column_headers);
+}
+
+sub xls2xlsx {
+  my ($xlsFile, $xlsxFile) = @_;
+  unless (defined($xlsxFile)) {
+    $xlsxFile = $xlsFile;
+    $xlsxFile =~ s/\.xls$/\.xlsx/i;
+  }
+  my ($tables, $table_names, $column_headers) = xls2tables($xlsFile);
+  tables2xlsx($xlsxFile, $tables, $table_names, undef, undef, $column_headers);
+}
+
+sub xlsx2xls {
+  my ($xlsxFile, $xlsFile) = @_;
+  unless (defined($xlsFile)) {
+    $xlsFile = $xlsxFile;
+    $xlsFile =~ s/\.xlsx$/\.xls/i;
+  }
+  my ($tables, $table_names, $column_headers) = xlsx2tables($xlsxFile);
+  tables2xls($xlsFile, $tables, $table_names, undef, undef, $column_headers);
 }
 
 1;
@@ -186,7 +232,7 @@ Data::Table::Excel - Convert between Data::Table objects and Excel (xls/xlsx) fi
   News: The package now includes "Perl Data::Table Cookbook" (PDF), which may serve as a better learning material.
   To download the free Cookbook, visit https://sites.google.com/site/easydatabase/
 
-  use Data::Table::Excel qw (tables2xls xls2tables tables2xlsx xlsx2tables);
+  use Data::Table::Excel qw (tables2xls xls2tables tables2xlsx xlsx2tables excelFileToTable is_xlsx xls2xlsx xlsx2xls);
 
   # read in two CSV tables and generate an Excel .xls binary file with two spreadsheets
   my $t_category = Data::Table::fromFile("Category.csv");
@@ -196,10 +242,10 @@ Data::Table::Excel - Convert between Data::Table objects and Excel (xls/xlsx) fi
   tables2xls("NorthWind.xls", [$t_category, $t_product], ["Category","Product"]);
 
   # read in NorthWind.xls file as two Data::Table objects
-  my ($tableObjects, $tableNames)=xls2tables("NorthWind.xls");
+  my ($tableObjects, $tableNames, $column_headers)=xls2tables("NorthWind.xls");
   for (my $i=0; $i<@$tableNames; $i++) {
     print "*** ". $tableNames->[$i], " ***\n";
-    print $tableObjects->[$i]->csv;
+    print $tableObjects->[$i]->csv($column_headers[$i]);
   }
 
   Outputs:
@@ -226,6 +272,13 @@ Data::Table::Excel - Convert between Data::Table objects and Excel (xls/xlsx) fi
   my ($tableObjects, $tableNames)=xlsx2tables("NorthWind.xlsx");
   # note: Spreadsheet::XLSX module is used to parse .xlsx file. Please make sure it is updated.
 
+  ($tableObjects, $tableNames, $column_headers)=excelFileToTable("NorthWind.xlsx");
+  # excelFileToTable will automatically detect the Excel format for the input file
+
+  # To convert Excel files between the two formats, use
+  xlsx2xls("NorthWind.xlsx", "NorthWind.xls");
+  xls2xlsx("NorthWind.xls", "NorthWind.xlsx");
+
 =head1 ABSTRACT
 
 This perl package provide utility methods to convert between an Excel file and Data::Table objects. It then enables you to take advantage of the Data::Table methods to further manipulate the data and/or export it into other formats such as CSV/TSV/HTML, etc.
@@ -241,35 +294,44 @@ we use Spreadsheet::XLSX and Excel::Writer::XLSX.  If this module gives incorrec
 
 =item xlsx2tables ($fileName, $sheetNames, $sheetIndices)
 
+=item excelFileToTable ($fileName, $sheetNames, $sheetIndices, $excelFormat)
+
 xls2tables is for reading Excel .xls files (binary, 2003 and prior), xlsx2table is for reading .xlsx file (2007, compressed XML format).
+excelFileToTable can automatically detect Excel format if format is not specified.
 
 $fileName is the input Excel file.
 $sheetNames is a reference to an array of sheet names.
 $sheetIndices is a reference to an array of sheet indices.
+$excelFormat in excelFileToTable has to be either "2003" or "2007". Auto-detected if not specified.
 If neither $sheetNames or $sheetIndices is provides, all sheets are converted into table objects, one table per sheet.
 If $sheetNames is provided, only sheets found in the @$sheetNames array is converted.
 If $sheetIndices is provided, only sheets match the index in the @$sheetIndices array is converted (notice the first spreadsheet has an index of 1).
 
-The method returns an array ($tableObjects, $tableNames).
+The method returns an array ($tableObjects, $tableNames, $columnHeaders).
 $tableObjects is a reference to an array of Data::Table objects.
 $tableNames is a reference to an array of sheet names, corresponding to $tableObjects.
+$columnHeaders is a reference to an array of booleans, indicating whether each table has original column header
+If a table does not have a column header, columns are named Col1, Col2, etc.
 
   # print each of spreadsheet into an HTML table on the web
-  ($tableObjects, $tableNames)=xls2tables("Tables.xls");
+  ($tableObjects, $tableNames, $columnHeaders)=xls2tables("Tables.xls");
   foreach my $t (@$tableObjects) {
     print "<h1>", shift @$tableNames, "</h1><br>";
     print $t->html;
   }
 
-  ($tableObjects, $tableNames)=xlsx2tables("Tables.xlsx", undef, [1]);
+  ($tableObjects, $tableNames, $columnHeaders)=xlsx2tables("Tables.xlsx", undef, [1]);
 
 This will only read the first sheet. By providing sheet names or sheet indicies, you save time if you are not interested in all the sheets.
 
-=item tables2xls ($fileName, $tables, $names, $colors, $portrait) 
+=item tables2xls ($fileName, $tables, $names, $colors, $portrait, $columnHeaders) 
 
-=item tables2xlsx ($fileName, $tables, $names, $colors, $portrait) 
+=item tables2xlsx ($fileName, $tables, $names, $colors, $portrait, $columnHeaders) 
+
+=item tables2excel ($fileName, $tables, $names, $colors, $portrait, $excelFormat, $columnHeaders)
 
 table2xls is for writing Excel .xls files (binary, 2003 and prior), xlsx2table is for writing .xlsx file (2007, compressed XML format).
+tables2excel will export to 2007 format, if $excelFormat is not specified.
 
 $fileName is used to name the output Excel file.
 $tables is a reference to an array of Data::Table objects to be write into the file, one sheet per table.
@@ -280,13 +342,25 @@ Acceptable color index (or name) is defined by the docs\palette.html file in the
 
 $portrait is a reference to an array of orientation flag (0 or 1), 1 is for Portrait (the default), where each row represents a table row.  In landscape (0) mode, each row represents a column.  (Similar to Data::Table::html and Data::Table::html2).
 
-The arrays pointed by $names, $colors and $portraits should be the same length as that of $tables. these customization values are applied to each table objects sequentially.
+$columnHeaders is a reference to an array of boolean, indicating whether to export column headers for each table. By default, column headers are exported.
+
+The arrays pointed by $names, $colors, $portraits and $columnHeader should be the same length as that of $tables. these customization values are applied to each table objects sequentially.
 If a value is missing for a table, the method will use the setting from the previous table.
 
-  tables2xls("TwoTables.xls", [$t_A, $t_B], ["Table_A","Table_B"], [["white","silver","gray"], undef], [1, 0]);
+  tables2xls("TwoTables.xls", [$t_A, $t_B], ["Table_A","Table_B"], [["white","silver","gray"], undef], [1, 0], [1, 1]);
 
 This will produce two spreadsheets named Table_A and Table_B for table $t_A and $t_B, respectively.  The first table is colored in a black-white style, the second is colored by the default style.
 The first table is the default portrait oritentation, the second is in the transposed orientation.
+
+=item is_xlsx($fileName)
+
+Returns boolean whether the given file is 2007 format. It does not rely on file name, but reads the first two bytes of the file. .xlsx is in Zip format, therefore the first two bytes are "PK".
+
+=item xlsx2xls($fromFileName, $toFileName)
+
+=item xls2xlsx($fromFileName, $toFileName)
+
+Converts an Excel file from one format to another. If $toFileName is not specified, $toFileName will be the same as $fromFileName, except with extension sets to .xlsx or .xls.
 
 =back
 

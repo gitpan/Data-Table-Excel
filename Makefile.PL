@@ -15,6 +15,6 @@ WriteMakefile(
                          Spreadsheet::WriteExcel => 0,
                          Spreadsheet::ParseExcel => 0,
                          Spreadsheet::XLSX => 0,
-	                       Excel::Writer::XLSX => 0
+	                 Excel::Writer::XLSX => 0
                       }
 );
