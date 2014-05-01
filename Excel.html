@@ -79,7 +79,7 @@
   tables2xlsx(&quot;NorthWind.xlsx&quot;, [$t_category, $t_product], undef, [['silver','white','black'], [45,'white',37]]);
   # read in NorthWind.xlsx file as two Data::Table objects
   my ($tableObjects, $tableNames)=xlsx2tables(&quot;NorthWind.xlsx&quot;);
-  # note: Spreadsheet::XLSX module is used to parse .xlsx file. Please make sure it is updated.</pre>
+  # note: Spreadsheet::ParseXLSX module is used to parse .xlsx file.</pre>
 <pre>
   ($tableObjects, $tableNames, $column_headers)=excelFileToTable(&quot;NorthWind.xlsx&quot;);
   # excelFileToTable will automatically detect the Excel format for the input file</pre>
@@ -97,7 +97,7 @@
 <hr />
 <h1><a name="description">DESCRIPTION</a></h1>
 <p>To read and write Excel .xls (2003 and prior) format, we use Spreadsheet::WriteExcel and Spreadsheet::ParseExcel; to read and write Excel .xlsx (2007 format),
-we use Spreadsheet::XLSX and Excel::Writer::XLSX.  If this module gives incorrect results, please check if the corresponding Perl modules are updated.</p>
+we use Spreadsheet::ParseXLSX and Excel::Writer::XLSX.  If this module gives incorrect results, please check if the corresponding Perl modules are updated. (We switch to Spreadsheet::ParseXLSX from Spreadsheet::XLSX from version 0.5)</p>
 <dl>
 <dt><strong><a name="xls2tables" class="item">xls2tables ($fileName, $sheetNames, $sheetIndices)</a></strong></dt>
 
@@ -109,8 +109,8 @@ we use Spreadsheet::XLSX and Excel::Writer::XLSX.  If this module gives incorrec
 <p>xls2tables is for reading Excel .xls files (binary, 2003 and prior), xlsx2table is for reading .xlsx file (2007, compressed XML format).
 excelFileToTable can automatically detect Excel format if format is not specified.</p>
 <p>$fileName is the input Excel file.
-$sheetNames is a reference to an array of sheet names.
-$sheetIndices is a reference to an array of sheet indices.
+$sheetNames is a string or a reference to an array of sheet names.
+$sheetIndices is a int or a reference to an array of sheet indices.
 $excelFormat in excelFileToTable has to be either &quot;2003&quot; or &quot;2007&quot;. Auto-detected if not specified.
 If neither $sheetNames or $sheetIndices is provides, all sheets are converted into table objects, one table per sheet.
 If $sheetNames is provided, only sheets found in the @$sheetNames array is converted.

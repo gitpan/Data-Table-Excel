@@ -14,7 +14,7 @@ WriteMakefile(
                          Data::Table => 1.52,
                          Spreadsheet::WriteExcel => 0,
                          Spreadsheet::ParseExcel => 0,
-                         Spreadsheet::XLSX => 0,
+                         Spreadsheet::ParseXLSX => 0,
 	                 Excel::Writer::XLSX => 0
                       }
 );

@@ -5,7 +5,8 @@ use strict;
 use Data::Table;
 use Spreadsheet::WriteExcel;
 use Spreadsheet::ParseExcel;
-use Spreadsheet::XLSX;
+#use Spreadsheet::XLSX;
+use Spreadsheet::ParseXLSX;
 use Excel::Writer::XLSX;
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK);
 use Carp;
@@ -19,7 +20,7 @@ use Exporter 'import';
 @EXPORT_OK = qw(
   tables2xls xls2tables tables2xlsx xlsx2tables xls2xlsx xlsx2xls is_xlsx excelFileToTable
 );
-$VERSION = '0.4';
+$VERSION = '0.5';
 
 sub xls2tables {
   my ($fileName, $sheetNames, $sheetIndices) = @_;
@@ -45,13 +46,19 @@ sub excelFileToTable {
   my ($fileName, $sheetNames, $sheetIndices, $excelFormat) = @_;
   my %sheetsName = ();
   my %sheetsIndex = ();
-  if (defined($sheetNames) && ref($sheetNames) eq 'ARRAY') {
-    foreach my $name (@$sheetNames) {
-      $sheetsName{$name} = 1;
+  if (defined($sheetNames)) {
+    $sheetNames=[$sheetNames] if (ref($sheetNames) eq 'SCALAR');
+    if (ref($sheetNames) eq 'ARRAY') {
+      foreach my $name (@$sheetNames) {
+        $sheetsName{$name} = 1;
+      }
     }
-  } elsif (defined($sheetIndices) && ref($sheetIndices) eq 'ARRAY') {
-    foreach my $idx (@$sheetIndices) {
-      $sheetsIndex{$idx} = 1;
+  } elsif (defined($sheetIndices)) {
+    $sheetIndices=[$sheetIndices] if (ref($sheetIndices) eq 'SCALAR');
+    if (ref($sheetIndices) eq 'ARRAY') {
+      foreach my $idx (@$sheetIndices) {
+        $sheetsIndex{$idx} = 1;
+      }
     }
   }
   my $excel = undef;
@@ -61,7 +68,9 @@ sub excelFileToTable {
   if ($excelFormat eq '2003') {
     $excel = Spreadsheet::ParseExcel::Workbook->Parse($fileName);
   } elsif ($excelFormat eq '2007') {
-    $excel = Spreadsheet::XLSX->new($fileName);
+    #$excel = Spreadsheet::XLSX->new($fileName);
+    my $parser=Spreadsheet::ParseXLSX->new;
+    $excel = $parser->parse($fileName);
   } else {
     croak "Unrecognized Excel format, must be either 2003 or 2007!";
   }
@@ -270,7 +279,7 @@ Data::Table::Excel - Convert between Data::Table objects and Excel (xls/xlsx) fi
   tables2xlsx("NorthWind.xlsx", [$t_category, $t_product], undef, [['silver','white','black'], [45,'white',37]]);
   # read in NorthWind.xlsx file as two Data::Table objects
   my ($tableObjects, $tableNames)=xlsx2tables("NorthWind.xlsx");
-  # note: Spreadsheet::XLSX module is used to parse .xlsx file. Please make sure it is updated.
+  # note: Spreadsheet::ParseXLSX module is used to parse .xlsx file.
 
   ($tableObjects, $tableNames, $column_headers)=excelFileToTable("NorthWind.xlsx");
   # excelFileToTable will automatically detect the Excel format for the input file
@@ -288,7 +297,7 @@ This perl package provide utility methods to convert between an Excel file and D
 =over 4
 
 To read and write Excel .xls (2003 and prior) format, we use Spreadsheet::WriteExcel and Spreadsheet::ParseExcel; to read and write Excel .xlsx (2007 format),
-we use Spreadsheet::XLSX and Excel::Writer::XLSX.  If this module gives incorrect results, please check if the corresponding Perl modules are updated.
+we use Spreadsheet::ParseXLSX and Excel::Writer::XLSX.  If this module gives incorrect results, please check if the corresponding Perl modules are updated. (We switch to Spreadsheet::ParseXLSX from Spreadsheet::XLSX from version 0.5)
 
 =item xls2tables ($fileName, $sheetNames, $sheetIndices) 
 
@@ -300,8 +309,8 @@ xls2tables is for reading Excel .xls files (binary, 2003 and prior), xlsx2table 
 excelFileToTable can automatically detect Excel format if format is not specified.
 
 $fileName is the input Excel file.
-$sheetNames is a reference to an array of sheet names.
-$sheetIndices is a reference to an array of sheet indices.
+$sheetNames is a string or a reference to an array of sheet names.
+$sheetIndices is a int or a reference to an array of sheet indices.
 $excelFormat in excelFileToTable has to be either "2003" or "2007". Auto-detected if not specified.
 If neither $sheetNames or $sheetIndices is provides, all sheets are converted into table objects, one table per sheet.
 If $sheetNames is provided, only sheets found in the @$sheetNames array is converted.
